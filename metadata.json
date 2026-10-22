@@ -1,0 +1,6 @@
+{
+  "name": "LifeDrop — Blood Donation Network",
+  "description": "Bangladesh's premier voluntary blood donation network connecting donors across all 64 districts with patients in emergency need.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
