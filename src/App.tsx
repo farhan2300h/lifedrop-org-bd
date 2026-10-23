@@ -42,6 +42,34 @@ function AppContent() {
   const [isUserDashboardOpen, setIsUserDashboardOpen] = useState(false);
   const [urgentRequestsCount, setUrgentRequestsCount] = useState(0);
 
+  // Open Admin Modal when returning from a password-reset email.
+  // This allows AdminModal to detect the recovery URL hash.
+  useEffect(() => {
+    const openResetView = () => {
+      const hash = window.location.hash;
+      const search = window.location.search;
+
+      const isPasswordRecovery =
+        hash.includes('reset-password') ||
+        hash.includes('type=recovery') ||
+        hash.includes('access_token=') ||
+        search.includes('type=recovery') ||
+        search.includes('access_token=');
+
+      if (isPasswordRecovery) {
+        setIsAdminModalOpen(true);
+      }
+    };
+
+    openResetView();
+
+    window.addEventListener('hashchange', openResetView);
+
+    return () => {
+      window.removeEventListener('hashchange', openResetView);
+    };
+  }, []);
+
   // Synchronize authentication state
   useEffect(() => {
     const unsubscribe = authService.subscribe((user) => {
@@ -244,4 +272,4 @@ export default function App() {
       <AppContent />
     </LanguageProvider>
   );
-}
+      }
