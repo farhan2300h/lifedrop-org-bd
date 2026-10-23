@@ -2,9 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { useLanguage } from '../context/LanguageContext';
 import { Donor, BloodRequest, RequestStatus, UserProfile, UserRole, DonationRecord } from '../types';
 import { bloodService } from '../services/bloodService';
-import { authService, getSupabaseConfig } from '../services/supabaseClient';
+import { authService, getSupabaseConfig, supabase } from '../services/supabaseClient';
 import { certificateService } from '../services/certificateService';
-import { webauthnService } from '../services/webauthnService';
 import { 
   X, 
   Shield, 
@@ -98,21 +97,60 @@ export const AdminModal: React.FC<AdminModalProps> = ({
   const [emergencyNotice, setEmergencyNotice] = useState('জরুরি রক্তের প্রয়োজনে সরাসরি কল করুন: +8801950902300 (২৪ ঘণ্টা খোলা)');
   const [noticeSavedMsg, setNoticeSavedMsg] = useState(false);
 
-  // Check URL hash for reset password
+  // Handle Supabase password recovery session
   useEffect(() => {
-    if (window.location.hash.includes('reset-password') || window.location.hash.includes('type=recovery')) {
-      setAuthView('reset_confirm');
-    }
+    let isMounted = true;
+
+    const checkRecovery = () => {
+      const hash = window.location.hash;
+      const search = window.location.search;
+      const hasRecoveryCallback =
+        hash.includes('reset-password') ||
+        hash.includes('type=recovery') ||
+        hash.includes('access_token=') ||
+        search.includes('type=recovery') ||
+        search.includes('code=') ||
+        search.includes('access_token=');
+
+      if (hasRecoveryCallback && isMounted) {
+        setAuthView('reset_confirm');
+        setRecoveryMessage(null);
+        setAuthError('');
+        setAuthSuccess('');
+      }
+    };
+
+    checkRecovery();
+    window.addEventListener('hashchange', checkRecovery);
+    window.addEventListener('popstate', checkRecovery);
+
+    const { data: authListener } = supabase
+      ? supabase.auth.onAuthStateChange((event) => {
+          if (!isMounted) return;
+          if (event === 'PASSWORD_RECOVERY') {
+            setAuthView('reset_confirm');
+            setRecoveryMessage(null);
+            setAuthError('');
+            setAuthSuccess('');
+          }
+        })
+      : { data: { subscription: { unsubscribe: () => {} } } };
+
+    return () => {
+      isMounted = false;
+      window.removeEventListener('hashchange', checkRecovery);
+      window.removeEventListener('popstate', checkRecovery);
+      authListener.subscription.unsubscribe();
+    };
   }, []);
 
-  const refreshAdminData = async () => {
+  const refreshAdminData = () => {
     setDonors(bloodService.getDonors());
     setRequests(bloodService.getRequests());
     setPendingDonations(bloodService.getAllPendingDonations());
     if (currentUser?.role === 'admin') {
       try {
-        const users = await authService.getAllUsers(currentUser);
-        setUsersList(users);
+        setUsersList(authService.getAllUsers(currentUser));
       } catch {
         // safe fallback
       }
@@ -161,42 +199,31 @@ export const AdminModal: React.FC<AdminModalProps> = ({
 
   if (!isOpen) return null;
 
-  // Handle Admin Login (Strict Server-Side Authorization & WebAuthn 2FA)
+  // Handle Login
   const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setAuthError('');
     setAuthSuccess('');
     setIsSubmitting(true);
 
-    // Call real Supabase Auth strictly requiring 'admin' role
-    const res = await authService.signIn(email, password, 'admin');
+    const res = await authService.signIn(email, password);
     setIsSubmitting(false);
 
     if (res.success && res.user) {
-      if (res.user.role !== 'admin') {
-        setAuthError('অনুমতি নেই (403 Forbidden): এই অ্যাকাউন্টটি সাধারণ সদস্যের। অ্যাডমিন প্যানেলে প্রবেশের অনুমতি কেবল অনুমোদিত অ্যাডমিনের রয়েছে।');
-        return;
-      }
-
-      // Check for WebAuthn / Passkey 2FA
-      const registeredKeys = webauthnService.getRegisteredPasskeys(res.user.email);
-      if (registeredKeys.length > 0 && webauthnService.isSupported()) {
-        setIsSubmitting(true);
-        const passkeyRes = await webauthnService.authenticatePasskey(res.user.email);
-        setIsSubmitting(false);
-
-        if (!passkeyRes.success) {
-          setAuthError(`বায়োমেট্রিক ২য় স্তর (Passkey 2FA) ব্যর্থ হয়েছে: ${passkeyRes.message}`);
-          return;
-        }
-      }
-
       setCurrentUser(res.user);
       setEmail('');
       setPassword('');
-      setAuthSuccess('অ্যাডমিন ভেরিফিকেশন সফল হয়েছে! কন্ট্রোল প্যানেল খোলা হচ্ছে...');
+
+      // If user is regular user, inform and open User Dashboard
+      if (res.user.role === 'user') {
+        setAuthSuccess('সাধারণ ব্যবহারকারী হিসেবে লগইন সফল হয়েছে! আপনার ইউজার ড্যাশবোর্ডে নেওয়া হচ্ছে...');
+        setTimeout(() => {
+          onClose();
+          openUserDashboard();
+        }, 1200);
+      }
     } else {
-      setAuthError(res.message || 'অ্যাডমিন ইমেইল বা পাসওয়ার্ড ভুল হয়েছে।');
+      setAuthError(res.message || 'ইমেইল বা পাসওয়ার্ড ভুল হয়েছে। অনুগ্রহ করে আবার চেষ্টা করুন।');
     }
   };
 
@@ -211,10 +238,7 @@ export const AdminModal: React.FC<AdminModalProps> = ({
       fullName: signupName,
       email: signupEmail,
       phone: signupPhone,
-      password: signupPassword,
-      bloodGroup: 'O+',
-      division: 'ঢাকা',
-      district: 'ঢাকা'
+      password: signupPassword
     });
     setIsSubmitting(false);
 
@@ -229,7 +253,6 @@ export const AdminModal: React.FC<AdminModalProps> = ({
       setAuthError(res.message || 'নিবন্ধন ব্যর্থ হয়েছে।');
     }
   };
-
 
   const handleLogout = async () => {
     await authService.signOut();
@@ -247,6 +270,11 @@ export const AdminModal: React.FC<AdminModalProps> = ({
 
     if (res.success) {
       setRecoveryMessage({ text: res.message, isError: false });
+      if (res.isDemo) {
+        setTimeout(() => {
+          setAuthView('reset_confirm');
+        }, 1500);
+      }
     } else {
       setRecoveryMessage({ text: res.message, isError: true });
     }
@@ -261,8 +289,8 @@ export const AdminModal: React.FC<AdminModalProps> = ({
       return;
     }
 
-    if (newPassword.length < 6) {
-      setRecoveryMessage({ text: 'পাসওয়ার্ড কমপক্ষে ৬ অক্ষরের হতে হবে।', isError: true });
+    if (newPassword.length < 8) {
+      setRecoveryMessage({ text: 'পাসওয়ার্ড কমপক্ষে ৮ অক্ষরের হতে হবে।', isError: true });
       return;
     }
 
@@ -359,11 +387,9 @@ export const AdminModal: React.FC<AdminModalProps> = ({
     }
   };
 
-  const handleResetData = async () => {
-    if (window.confirm('ডাটাবেজ থেকে সর্বশেষ তথ্য রিফ্রেশ করতে চান?')) {
-      await bloodService.fetchRealDonors();
-      await bloodService.fetchRealRequests();
-      refreshAdminData();
+  const handleResetData = () => {
+    if (window.confirm('সকল ডেমো রক্তদাতা ও রক্তের অনুরোধ পূর্বাবস্থায় ফিরিয়ে নিতে চান?')) {
+      bloodService.resetToSampleData();
     }
   };
 
@@ -595,114 +621,240 @@ CREATE POLICY "Users can delete own request" ON public.blood_requests
         {/* ============================================================ */}
         {/* VIEW 1: AUTHENTICATION FLOW (LOGIN, SIGN UP, PASSWORD RESET)  */}
         {/* ============================================================ */}
-        {/* ============================================================ */}
-        {/* VIEW 1: DEDICATED ADMIN LOGIN (Requirement 5: Strict Admin Login) */}
-        {/* ============================================================ */}
         {!isAdminAuthenticated ? (
-          <div className="flex-1 flex flex-col items-center justify-center p-6 sm:p-10 bg-slate-50/60 overflow-y-auto">
-            <div className="w-full max-w-md bg-white rounded-3xl border border-slate-200/90 shadow-lg p-6 sm:p-8 space-y-6">
-              
-              {/* Branding & Title */}
-              <div className="text-center space-y-2">
-                <div className="w-12 h-12 rounded-2xl bg-slate-900 text-white flex items-center justify-center mx-auto shadow-md">
-                  <Shield className="w-6 h-6 text-red-500 fill-red-500" />
+          <div className="flex-1 flex flex-col md:flex-row overflow-y-auto">
+            
+            {/* Left Promotional / Dual Role Info Panel */}
+            <div className="w-full md:w-5/12 bg-slate-900 text-white p-6 sm:p-8 flex flex-col justify-between border-b md:border-b-0 md:border-r border-slate-800">
+              <div className="space-y-6">
+                <div className="inline-flex items-center gap-2 bg-red-950/70 text-red-300 border border-red-800/60 px-3 py-1 rounded-full text-xs font-bold">
+                  <ShieldCheck className="w-4 h-4 text-red-400" />
+                  <span>Role-Based Access Control (RBAC)</span>
                 </div>
-                <h3 className="text-xl font-bold text-slate-900 font-display">
-                  অ্যাডমিন লগইন পোর্টাল
-                </h3>
-                <p className="text-xs text-slate-500 leading-relaxed max-w-xs mx-auto">
-                  শুধুমাত্র অনুমোদিত অ্যাডমিনের জন্য সংরক্ষিত। সার্ভার-সাইড রোল যাচাইয়ের মাধ্যমে প্রবেশাধিকার নিশ্চিত করা হয়।
-                </p>
+
+                <div className="space-y-2">
+                  <h3 className="text-xl sm:text-2xl font-bold tracking-tight text-white font-display">
+                    নিরাপদ ও অধিকারভিত্তিক অ্যাক্সেস
+                  </h3>
+                  <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
+                    LifeDrop সিস্টেমে সাধারণ সদস্য ও অ্যাডমিনের জন্য রয়েছে পৃথক ও সুনির্দিষ্ট অধিকার। সাধারণ ইউজার নিজের প্রোফাইল ও রক্তের অনুরোধ নিয়ন্ত্রণ করবেন, আর অ্যাডমিন সমগ্র নেটওয়ার্ক পরিচালনা করবেন।
+                  </p>
+                </div>
+
+                {/* Role Highlights */}
+                <div className="space-y-3 pt-2 text-xs">
+                  <div className="bg-slate-800/80 p-3 rounded-xl border border-slate-700/60 space-y-1">
+                    <span className="text-red-400 font-bold block">👤 সাধারণ ইউজার (Role: user)</span>
+                    <p className="text-slate-300 text-[11px]">
+                      নিজের অ্যাকাউন্ট, প্রোফাইল, রক্তদাতা নিবন্ধন ও জরুরি রক্তের অনুরোধ পরিচালনা করতে পারেন।
+                    </p>
+                  </div>
+                  <div className="bg-slate-800/80 p-3 rounded-xl border border-slate-700/60 space-y-1">
+                    <span className="text-emerald-400 font-bold block">🛡️ অ্যাডমিন (Role: admin)</span>
+                    <p className="text-slate-300 text-[11px]">
+                      সকল ইউজার, রক্তদাতা অনুমোদন, অনুরোধ, নোটিশ ও কনটেন্ট পরিচালনা করতে পারেন।
+                    </p>
+                  </div>
+                </div>
+
+
+              </div>
+
+              <div className="pt-6 border-t border-slate-800 text-[11px] text-slate-400">
+                সিস্টেম স্ট্যাটাস: <strong className="text-slate-300">{supabaseConfig.isConfigured ? 'Supabase Connected' : 'Review Mode (Active)'}</strong>
+              </div>
+            </div>
+
+            {/* Right Forms Area */}
+            <div className="w-full md:w-7/12 p-6 sm:p-8 flex flex-col justify-center">
+              
+              {/* Form Navigation Tabs */}
+              <div className="flex border-b border-slate-200 mb-6 gap-4 text-xs font-bold">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAuthView('login');
+                    setAuthError('');
+                    setAuthSuccess('');
+                  }}
+                  className={`pb-2.5 border-b-2 transition-colors cursor-pointer ${
+                    authView === 'login'
+                      ? 'border-red-600 text-red-600'
+                      : 'border-transparent text-slate-500 hover:text-slate-900'
+                  }`}
+                >
+                  লগইন (Sign In)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAuthView('signup');
+                    setAuthError('');
+                    setAuthSuccess('');
+                  }}
+                  className={`pb-2.5 border-b-2 transition-colors cursor-pointer ${
+                    authView === 'signup'
+                      ? 'border-red-600 text-red-600'
+                      : 'border-transparent text-slate-500 hover:text-slate-900'
+                  }`}
+                >
+                  নতুন একাউন্ট খুলুন (Sign Up)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAuthView('forgot_request');
+                    setAuthError('');
+                    setAuthSuccess('');
+                  }}
+                  className={`pb-2.5 border-b-2 transition-colors cursor-pointer ${
+                    authView === 'forgot_request' || authView === 'reset_confirm'
+                      ? 'border-red-600 text-red-600'
+                      : 'border-transparent text-slate-500 hover:text-slate-900'
+                  }`}
+                >
+                  পাসওয়ার্ড রিকভারি
+                </button>
               </div>
 
               {/* Status / Error Alerts */}
               {authError && (
-                <div className="p-3 bg-red-50 border border-red-200 text-red-700 rounded-xl text-xs flex items-start gap-2">
-                  <AlertCircle className="w-4 h-4 shrink-0 text-red-600 mt-0.5" />
+                <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-700 rounded-xl text-xs flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 shrink-0" />
                   <span>{authError}</span>
                 </div>
               )}
               {authSuccess && (
-                <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xl text-xs flex items-center gap-2">
-                  <CheckCircle className="w-4 h-4 shrink-0 text-emerald-600" />
+                <div className="mb-4 p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xl text-xs flex items-center gap-2">
+                  <CheckCircle className="w-4 h-4 shrink-0" />
                   <span>{authSuccess}</span>
                 </div>
               )}
 
-              {/* 1. ADMIN SIGN IN FORM (Requirement 5: Admin Email, Password, Forgot Password, Login Button) */}
+              {/* 1. SIGN IN FORM */}
               {authView === 'login' && (
                 <form onSubmit={handleLoginSubmit} className="space-y-4">
-                  {/* Admin Email */}
                   <div>
                     <label className="block text-xs font-semibold text-slate-700 mb-1">
-                      অ্যাডমিন ইমেইল (Admin Email) <span className="text-red-600">*</span>
+                      ইমেইল ঠিকানা (Email)
                     </label>
-                    <div className="relative">
-                      <Mail className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
-                      <input
-                        type="email"
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        placeholder="admin@lifedrop.org.bd"
-                        className="w-full pl-9 pr-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm focus:bg-white focus:outline-hidden focus:ring-2 focus:ring-red-600 transition-colors font-mono"
-                        required
-                      />
-                    </div>
+                    <input
+                      type="email"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      placeholder="admin@lifedrop.org.bd বা আপনার ইমেইল"
+                      className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm focus:bg-white focus:outline-hidden focus:ring-2 focus:ring-red-600 transition-colors"
+                      required
+                    />
                   </div>
 
-                  {/* Password & Forgot Password */}
                   <div>
                     <div className="flex items-center justify-between mb-1">
                       <label className="block text-xs font-semibold text-slate-700">
-                        পাসওয়ার্ড (Password) <span className="text-red-600">*</span>
+                        পাসওয়ার্ড (Password)
                       </label>
                       <button
                         type="button"
-                        onClick={() => {
-                          setAuthView('forgot_request');
-                          setRecoveryEmail(email);
-                          setAuthError('');
-                          setAuthSuccess('');
-                        }}
+                        onClick={() => setAuthView('forgot_request')}
                         className="text-xs text-red-600 hover:text-red-700 font-semibold cursor-pointer"
                       >
                         পাসওয়ার্ড ভুলে গেছেন?
                       </button>
                     </div>
-                    <div className="relative">
-                      <Lock className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
-                      <input
-                        type="password"
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
-                        placeholder="••••••••"
-                        className="w-full pl-9 pr-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm focus:bg-white focus:outline-hidden focus:ring-2 focus:ring-red-600 transition-colors"
-                        required
-                      />
-                    </div>
+                    <input
+                      type="password"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      placeholder="••••••••"
+                      className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm focus:bg-white focus:outline-hidden focus:ring-2 focus:ring-red-600 transition-colors"
+                      required
+                    />
                   </div>
 
-                  {/* WebAuthn Passkey Indicator */}
-                  <div className="flex items-center justify-between p-2.5 bg-slate-50 rounded-xl border border-slate-200/80 text-[11px] text-slate-600">
-                    <span className="flex items-center gap-1.5 font-medium">
-                      <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
-                      <span>WebAuthn / Passkey 2FA</span>
-                    </span>
-                    <span className="text-[10px] font-mono text-slate-500">Hardware Protected</span>
-                  </div>
-
-                  {/* Login Button */}
                   <button
                     type="submit"
                     disabled={isSubmitting}
-                    className="w-full py-3 px-4 bg-red-600 hover:bg-red-700 active:bg-red-800 text-white rounded-xl text-xs sm:text-sm font-bold shadow-md shadow-red-200 transition-colors cursor-pointer flex items-center justify-center gap-2"
+                    className="w-full py-2.5 px-4 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs sm:text-sm font-bold shadow-md shadow-red-200 transition-colors cursor-pointer flex items-center justify-center gap-2"
                   >
-                    {isSubmitting ? (
-                      <RefreshCw className="w-4 h-4 animate-spin" />
-                    ) : (
-                      <Lock className="w-4 h-4" />
-                    )}
-                    <span>অ্যাডমিন হিসেবে লগইন করুন</span>
+                    {isSubmitting ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Lock className="w-4 h-4" />}
+                    <span>লগইন করুন</span>
+                  </button>
+                </form>
+              )}
+
+              {/* 2. SIGN UP FORM (Requirement 5: default role=user) */}
+              {authView === 'signup' && (
+                <form onSubmit={handleSignUpSubmit} className="space-y-4">
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">
+                      আপনার পুরো নাম (Full Name)
+                    </label>
+                    <input
+                      type="text"
+                      value={signupName}
+                      onChange={(e) => setSignupName(e.target.value)}
+                      placeholder="যেমন: তানভীর হাসান"
+                      className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm focus:bg-white focus:outline-hidden focus:ring-2 focus:ring-red-600 transition-colors"
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">
+                      ইমেইল ঠিকানা (Email)
+                    </label>
+                    <input
+                      type="email"
+                      value={signupEmail}
+                      onChange={(e) => setSignupEmail(e.target.value)}
+                      placeholder="name@example.com"
+                      className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm focus:bg-white focus:outline-hidden focus:ring-2 focus:ring-red-600 transition-colors"
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">
+                      মোবাইল নম্বর (Phone)
+                    </label>
+                    <input
+                      type="tel"
+                      value={signupPhone}
+                      onChange={(e) => setSignupPhone(e.target.value)}
+                      placeholder="01XXXXXXXXX"
+                      className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm focus:bg-white focus:outline-hidden focus:ring-2 focus:ring-red-600 transition-colors"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">
+                      পাসওয়ার্ড (Password)
+                    </label>
+                    <input
+                      type="password"
+                      value={signupPassword}
+                      onChange={(e) => setSignupPassword(e.target.value)}
+                      placeholder="কমপক্ষে ৬ অক্ষর"
+                      className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm focus:bg-white focus:outline-hidden focus:ring-2 focus:ring-red-600 transition-colors"
+                      required
+                    />
+                  </div>
+
+                  {/* RBAC Notice (Requirement 5) */}
+                  <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 text-[11px] text-blue-900 flex items-start gap-2">
+                    <Info className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
+                    <span>
+                      নিরাপত্তা নীতি: নতুন রেজিস্ট্রেশন করলে স্বয়ংক্রিয়ভাবে 'সাধারণ সদস্য (User)' রোল বরাদ্দ করা হয়। কেউ নিজের অ্যাকাউন্ট থেকে অ্যাডমিন রোল তৈরি করতে পারেন না।
+                    </span>
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={isSubmitting}
+                    className="w-full py-2.5 px-4 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs sm:text-sm font-bold shadow-md shadow-red-200 transition-colors cursor-pointer flex items-center justify-center gap-2"
+                  >
+                    {isSubmitting ? <RefreshCw className="w-4 h-4 animate-spin" /> : <UserPlus className="w-4 h-4" />}
+                    <span>অ্যাকাউন্ট তৈরি করুন (Register as User)</span>
                   </button>
                 </form>
               )}
@@ -788,7 +940,7 @@ CREATE POLICY "Users can delete own request" ON public.blood_requests
                       type="password"
                       value={newPassword}
                       onChange={(e) => setNewPassword(e.target.value)}
-                      placeholder="কমপক্ষে ৬ অক্ষরের পাসওয়ার্ড"
+                      placeholder="কমপক্ষে ৮ অক্ষরের পাসওয়ার্ড"
                       className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm focus:bg-white focus:outline-hidden focus:ring-2 focus:ring-red-600"
                       required
                     />
@@ -1587,3 +1739,10 @@ CREATE POLICY "Users can delete own request" ON public.blood_requests
     </div>
   );
 };
+                   </div>
+
+                      <button
+                        onClick={handleCopySchema}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-bold transition-colors cursor-pointer shadow-xs"
+                      >
+                        {copiedSchema ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5
