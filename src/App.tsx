@@ -4,10 +4,11 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { LanguageProvider, useLanguage } from './context/LanguageContext';
+import { LanguageProvider } from './context/LanguageContext';
 import { ActivePage, BloodGroup, UserProfile } from './types';
 import { bloodService } from './services/bloodService';
 import { authService } from './services/supabaseClient';
+
 import { Navbar } from './components/Navbar';
 import { MobileBottomNav } from './components/MobileBottomNav';
 import { Footer } from './components/Footer';
@@ -24,6 +25,7 @@ import { UserDashboardPage } from './components/UserDashboardPage';
 
 function AppContent() {
   const [activePage, setActivePage] = useState<ActivePage>('home');
+
   const [searchFilters, setSearchFilters] = useState<{
     bloodGroup?: BloodGroup | 'ALL';
     division?: string;
@@ -31,31 +33,42 @@ function AppContent() {
     upazila?: string;
   } | null>(null);
 
-  // Authentication & RBAC User State
-  const [currentUser, setCurrentUser] = useState<UserProfile | null>(() => authService.getCurrentUser());
+  // Authentication and user state
+  const [currentUser, setCurrentUser] = useState<UserProfile | null>(
+    () => authService.getCurrentUser()
+  );
+
   const [isAdminModalOpen, setIsAdminModalOpen] = useState(false);
   const [isUserDashboardOpen, setIsUserDashboardOpen] = useState(false);
   const [urgentRequestsCount, setUrgentRequestsCount] = useState(0);
 
-  // Keep auth state synchronized reactively across all windows/actions
+  // Synchronize authentication state
   useEffect(() => {
-    const unsub = authService.subscribe((user) => {
+    const unsubscribe = authService.subscribe((user) => {
       setCurrentUser(user);
     });
-    return unsub;
+
+    return unsubscribe;
   }, []);
 
-  // Update urgent emergency counts
+  // Update urgent blood request count
   useEffect(() => {
     const updateCount = () => {
-      const reqs = bloodService.getRequests();
-      setUrgentRequestsCount(reqs.filter(r => r.status === 'urgent').length);
+      const requests = bloodService.getRequests();
+
+      setUrgentRequestsCount(
+        requests.filter((request) => request.status === 'urgent').length
+      );
     };
+
     updateCount();
-    const unsub = bloodService.subscribe(updateCount);
-    return unsub;
+
+    const unsubscribe = bloodService.subscribe(updateCount);
+
+    return unsubscribe;
   }, []);
 
+  // Navigate to donor search with filters
   const handleSearchWithFilters = (filters: {
     bloodGroup?: BloodGroup | 'ALL';
     division?: string;
@@ -67,16 +80,20 @@ function AppContent() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
+  // Sign out
   const handleLogout = async () => {
     await authService.signOut();
+
     setCurrentUser(null);
     setActivePage('home');
+
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-[#fcfcfd] text-slate-800 antialiased selection:bg-red-100 selection:text-red-900">
-      {/* Top Navigation Bar with RBAC profile display */}
+    <div className="w-full min-w-0 min-h-screen flex flex-col overflow-x-clip bg-[#fcfcfd] text-slate-800 antialiased selection:bg-red-100 selection:text-red-900">
+
+      {/* Header navigation */}
       <Navbar
         activePage={activePage}
         setActivePage={setActivePage}
@@ -88,8 +105,8 @@ function AppContent() {
         }}
       />
 
-      {/* Main Dynamic Viewport */}
-      <main className="flex-1 pb-20 lg:pb-0">
+      {/* Main page content */}
+      <main className="w-full min-w-0 flex-1 pb-20 lg:pb-0">
         {activePage === 'home' && (
           <HomePage
             setActivePage={setActivePage}
@@ -119,18 +136,14 @@ function AppContent() {
         )}
 
         {activePage === 'eligibility' && (
-          <EligibilityPage
-            setActivePage={setActivePage}
-          />
+          <EligibilityPage setActivePage={setActivePage} />
         )}
 
         {(activePage === 'about' || activePage === 'contact') && (
-          <AboutContactPage
-            setActivePage={setActivePage}
-          />
+          <AboutContactPage setActivePage={setActivePage} />
         )}
 
-        {/* Dedicated User Registration & Login Page (Requirement 1, 2, 3) */}
+        {/* Login and registration */}
         {(activePage === 'login' || activePage === 'signup') && (
           <AuthPage
             initialMode={activePage}
@@ -141,7 +154,7 @@ function AppContent() {
           />
         )}
 
-        {/* Dedicated User Dashboard Page (Requirement 4, 5, 7) */}
+        {/* User dashboard */}
         {activePage === 'dashboard' && (
           currentUser ? (
             <UserDashboardPage
@@ -169,7 +182,7 @@ function AppContent() {
         openAdminModal={() => setIsAdminModalOpen(true)}
       />
 
-      {/* Mobile-First Bottom Navigation Bar */}
+      {/* Fixed mobile bottom navigation: Home, Search, Emergency, Donors */}
       <MobileBottomNav
         activePage={activePage}
         setActivePage={setActivePage}
@@ -178,16 +191,16 @@ function AppContent() {
         openUserDashboard={() => {
           if (currentUser) {
             setActivePage('dashboard');
-            window.scrollTo({ top: 0, behavior: 'smooth' });
           } else {
             setActivePage('login');
-            window.scrollTo({ top: 0, behavior: 'smooth' });
           }
+
+          window.scrollTo({ top: 0, behavior: 'smooth' });
         }}
         urgentRequestsCount={urgentRequestsCount}
       />
 
-      {/* Admin Panel & Multi-Role Authentication Modal */}
+      {/* Admin modal */}
       <AdminModal
         isOpen={isAdminModalOpen}
         onClose={() => setIsAdminModalOpen(false)}
@@ -199,7 +212,7 @@ function AppContent() {
         }}
       />
 
-      {/* Quick User Dashboard Modal (if opened via shortcut) */}
+      {/* User dashboard modal */}
       {currentUser && isUserDashboardOpen && (
         <UserDashboardModal
           isOpen={isUserDashboardOpen}
