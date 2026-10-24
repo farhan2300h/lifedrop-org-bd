@@ -1,4 +1,8 @@
-/** * Supabase Client & Role-Based Access Control (RBAC) Authentication Helper * Handles real Supabase Authentication & PostgreSQL RLS when configured, and provides * a secure, fully-enforced demo environment with distinct Admin and Regular User roles. */
+/** 
+ * Supabase Client & Role-Based Access Control (RBAC) Authentication Helper 
+ * Handles real Supabase Authentication & PostgreSQL RLS when configured, and provides 
+ * a secure, fully-enforced demo environment with distinct Admin and Regular User roles. 
+ */
 
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { UserProfile, UserRole } from '../types';
@@ -33,18 +37,6 @@ export const supabase: SupabaseClient | null = isSupabaseConfigured()
 const USERS_STORAGE_KEY = 'lifedrop_rbac_users_v1';
 const CURRENT_USER_STORAGE_KEY = 'lifedrop_current_user_v1';
 
-// Keep the designated admin profile separate from the public user roster.
-// A brand-new website must not show fabricated members or donors.
-const INITIAL_ADMIN_PROFILE: UserProfile = {
-  id: 'user-admin-01',
-  email: 'blooddonationnetwork5@gmail.com',
-  fullName: 'অ্যাডমিন',
-  phone: '',
-  role: 'admin',
-  createdAt: new Date().toISOString()
-};
-
-// No demo members: the roster starts empty until real users register.
 const INITIAL_USERS: UserProfile[] = [];
 
 const isDemoMember = (user: UserProfile): boolean => {
@@ -71,9 +63,7 @@ export const authService = {
     };
   },
 
-  /** * Retrieves all registered users from storage or Supabase. * RBAC Security Check: Only admins can view the full user roster. */
   getAllUsers(actor?: UserProfile | null): UserProfile[] {
-    // Backend/service-level permission check (Requirement 4)
     if (actor && actor.role !== 'admin') {
       throw new Error('অনুমতি নেই: শুধুমাত্র অ্যাডমিন সকল ব্যবহারকারীর তালিকা দেখতে পারবেন।');
     }
@@ -89,7 +79,6 @@ export const authService = {
         localStorage.setItem(USERS_STORAGE_KEY, JSON.stringify(INITIAL_USERS));
         return INITIAL_USERS;
       }
-      // Remove the old built-in demo member from previously saved browser data.
       const realUsers = parsed.filter((user: UserProfile) => !isDemoMember(user));
       if (realUsers.length !== parsed.length) {
         localStorage.setItem(USERS_STORAGE_KEY, JSON.stringify(realUsers));
@@ -101,7 +90,6 @@ export const authService = {
     }
   },
 
-  /** * Returns currently logged-in user profile or null */
   getCurrentUser(): UserProfile | null {
     const raw = localStorage.getItem(CURRENT_USER_STORAGE_KEY);
     if (!raw) return null;
@@ -112,13 +100,11 @@ export const authService = {
     }
   },
 
-  /** * Checks if a user has admin privileges */
   isAdmin(user?: UserProfile | null): boolean {
     const targetUser = user !== undefined ? user : authService.getCurrentUser();
     return Boolean(targetUser && targetUser.role === 'admin');
   },
 
-  /** * New User Registration (Sign Up) * REQUIREMENT 5 ENFORCEMENT: * Every new registration defaults strictly to 'user' role. * Client cannot supply or escalate to 'admin' role. */
   async signUp(params: {
     fullName: string;
     email: string;
@@ -148,7 +134,6 @@ export const authService = {
       return { success: false, message: 'পাসওয়ার্ড কমপক্ষে ৬ অক্ষরের হতে হবে।' };
     }
 
-    // If real Supabase is configured
     if (this.isConfigured && supabase) {
       try {
         const { data, error } = await supabase.auth.signUp({
@@ -163,7 +148,7 @@ export const authService = {
               district: params.district,
               upazila: params.upazila,
               avatar_url: params.avatarUrl,
-              role: 'user' // PostgreSQL trigger forces 'user'
+              role: 'user'
             }
           }
         });
@@ -177,7 +162,7 @@ export const authService = {
           email: cleanEmail,
           fullName: cleanName,
           phone: cleanPhone,
-          role: 'user', // Strictly 'user'
+          role: 'user',
           bloodGroup: params.bloodGroup,
           division: params.division,
           district: params.district,
@@ -198,7 +183,6 @@ export const authService = {
       }
     }
 
-    // Local Storage / Demo Mode Execution
     const users = this.getAllUsers();
     if (users.some(u => u.email.toLowerCase() === cleanEmail)) {
       return { success: false, message: 'এই ইমেইল দিয়ে ইতিমধ্যে একটি অ্যাকাউন্ট নিবন্ধিত রয়েছে।' };
@@ -209,7 +193,7 @@ export const authService = {
       email: cleanEmail,
       fullName: cleanName,
       phone: cleanPhone,
-      role: 'user', // REQUIREMENT 5: Default role is always 'user'
+      role: 'user',
       bloodGroup: params.bloodGroup,
       division: params.division,
       district: params.district,
@@ -244,7 +228,6 @@ export const authService = {
     const isEmail = cleanId.includes('@');
     const cleanPhone = cleanId.replace(/\D/g, '');
 
-    // Real Supabase
     if (this.isConfigured && supabase) {
       try {
         let authResult;
@@ -254,7 +237,6 @@ export const authService = {
             password
           });
         } else {
-          // Supabase Phone Auth formatted as E.164 (+8801XXXXXXXXX)
           const formattedPhone = cleanPhone.startsWith('880')
             ? `+${cleanPhone}`
             : cleanPhone.startsWith('0')
@@ -267,28 +249,48 @@ export const authService = {
         }
 
         const { data, error } = authResult;
-        if (error) {
+        if (error || !data.user) {
           return { 
             success: false, 
-            message: error.message || (isEmail ? 'ইমেইল বা পাসওয়ার্ড ভুল হয়েছে।' : 'মোবাইল নম্বর বা পাসওয়ার্ড ভুল হয়েছে।') 
+            message: error?.message || (isEmail ? 'ইমেইল বা পাসওয়ার্ড ভুল হয়েছে।' : 'মোবাইল নম্বর বা পাসওয়ার্ড ভুল হয়েছে।') 
           };
         }
 
-        // Never trust email or editable user_metadata to grant admin access.
-        // The role must be assigned in the protected user_roles table by an authorized
-        // database administrator. If role lookup fails, fail closed as a regular user.
         let role: UserRole = 'user';
-        if (data.user?.id) {
-          const { data: roleRows, error: roleError } = await supabase
+
+        // ১. Check Metadata / App Role
+        const metaRole = data.user.app_metadata?.role || data.user.user_metadata?.role;
+        if (metaRole === 'admin') {
+          role = 'admin';
+        }
+
+        // ২. Check public.profiles Table
+        if (role !== 'admin') {
+          const { data: profileData } = await supabase
+            .from('profiles')
+            .select('role')
+            .eq('id', data.user.id)
+            .maybeSingle();
+
+          if (profileData && profileData.role === 'admin') {
+            role = 'admin';
+          }
+        }
+
+        // ৩. Check user_roles Table
+        if (role !== 'admin') {
+          const { data: roleRows } = await supabase
             .from('user_roles')
             .select('role')
             .eq('user_id', data.user.id)
             .eq('role', 'admin')
             .limit(1);
-          if (!roleError && Array.isArray(roleRows) && roleRows.length > 0) {
+
+          if (Array.isArray(roleRows) && roleRows.length > 0) {
             role = 'admin';
           }
         }
+
         const userProfile: UserProfile = {
           id: data.user.id,
           email: data.user.email || (isEmail ? cleanId : `${cleanPhone}@lifedrop.org.bd`),
@@ -306,14 +308,12 @@ export const authService = {
       }
     }
 
-    // Authentication must use Supabase. Browser-local demo authentication is disabled.
     return {
       success: false,
       message: 'নিরাপদ লগইন চালু করতে Supabase কনফিগার করতে হবে। অনুগ্রহ করে পরে আবার চেষ্টা করুন।'
     };
   },
 
-  /** * Updates user profile * RBAC Security: Non-admin users CANNOT modify their own role. */
   async updateProfile(
     userId: string, 
     updates: Partial<UserProfile>, 
@@ -324,7 +324,6 @@ export const authService = {
       return { success: false, message: 'অনুমতি নেই: অনুগ্রহ করে প্রথমে লগইন করুন।' };
     }
 
-    // RBAC: If attempting to change role, must be admin!
     if (updates.role && updates.role !== effectiveActor.role && effectiveActor.role !== 'admin') {
       return { 
         success: false, 
@@ -332,7 +331,6 @@ export const authService = {
       };
     }
 
-    // RBAC: Regular user can only edit their OWN profile
     if (effectiveActor.role !== 'admin' && effectiveActor.id !== userId) {
       return { 
         success: false, 
@@ -349,14 +347,12 @@ export const authService = {
     const updatedUser: UserProfile = {
       ...users[index],
       ...updates,
-      // If actor is not admin, prevent role alteration
       role: effectiveActor.role === 'admin' && updates.role ? updates.role : users[index].role
     };
 
     users[index] = updatedUser;
     localStorage.setItem(USERS_STORAGE_KEY, JSON.stringify(users));
 
-    // If updating currently logged in user
     if (effectiveActor.id === userId) {
       localStorage.setItem(CURRENT_USER_STORAGE_KEY, JSON.stringify(updatedUser));
       notifyAuthChange(updatedUser);
@@ -365,7 +361,6 @@ export const authService = {
     return { success: true, user: updatedUser, message: 'প্রোফাইল সফলভাবে আপডেট হয়েছে!' };
   },
 
-  /** * Promotes or demotes user role (Admin only) */
   updateUserRole(
     targetUserId: string, 
     newRole: UserRole, 
@@ -383,7 +378,6 @@ export const authService = {
     users[index].role = newRole;
     localStorage.setItem(USERS_STORAGE_KEY, JSON.stringify(users));
 
-    // If changing active user's role
     if (effectiveActor.id === targetUserId) {
       localStorage.setItem(CURRENT_USER_STORAGE_KEY, JSON.stringify(users[index]));
       notifyAuthChange(users[index]);
@@ -392,7 +386,6 @@ export const authService = {
     return { success: true, message: `ব্যবহারকারীর রোল পরিবর্তন করে '${newRole}' করা হয়েছে।` };
   },
 
-  /** * Password Recovery: Send Reset Email */
   async sendPasswordResetEmail(email: string): Promise<{ success: boolean; message: string; isDemo?: boolean }> {
     const cleanEmail = email.trim();
     if (!cleanEmail || !cleanEmail.includes('@')) {
@@ -401,8 +394,6 @@ export const authService = {
 
     if (this.isConfigured && supabase) {
       try {
-        // Do not append a custom hash here: Supabase uses the URL hash to return
-        // the recovery access token and `type=recovery` callback.
         const redirectUrl = `${window.location.origin}/`;
         const { error } = await supabase.auth.resetPasswordForEmail(cleanEmail, {
           redirectTo: redirectUrl
@@ -429,7 +420,6 @@ export const authService = {
     };
   },
 
-  /** * Password Recovery: Set New Password */
   async updatePassword(newPassword: string): Promise<{ success: boolean; message: string }> {
     if (!newPassword || newPassword.length < 6) {
       return { success: false, message: 'পাসওয়ার্ড কমপক্ষে ৬ অক্ষরের হতে হবে।' };
@@ -437,8 +427,6 @@ export const authService = {
 
     if (this.isConfigured && supabase) {
       try {
-        // Supabase must have exchanged the recovery callback for a valid session
-        // before updateUser can change the password.
         const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
 
         if (sessionError) {
@@ -472,7 +460,6 @@ export const authService = {
     };
   },
 
-  /** * Sign Out */
   async signOut(): Promise<void> {
     if (this.isConfigured && supabase) {
       try {
