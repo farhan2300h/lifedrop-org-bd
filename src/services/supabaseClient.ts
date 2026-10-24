@@ -38,6 +38,16 @@ function notifyAuthChange(user: UserProfile | null) {
   authListeners.forEach(listener => listener(user));
 }
 
+// 📁 গ্যালারি ফাইলকে সরাসরি ছবিতে রূপান্তর করার ফাংশন
+export const convertFileToBase64 = (file: File): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = (error) => reject(error);
+  });
+};
+
 export const authService = {
   get isConfigured(): boolean {
     return isSupabaseConfigured();
@@ -60,7 +70,7 @@ export const authService = {
     try { return JSON.parse(raw); } catch { return null; }
   },
 
-  // 🎯 প্রোফাইল, নাম, ঠিকানা ও ছবি স্থায়ীভাবে আপডেট করার মেথড 🎯
+  // 🎯 প্রোফাইল, নাম, ঠিকানা ও গ্যালারির ছবি আপডেট করার মেথড
   async updateProfile(
     userId: string, 
     updates: Partial<UserProfile>, 
@@ -68,7 +78,6 @@ export const authService = {
   ): Promise<{ success: boolean; user?: UserProfile; message?: string }> {
     const current = this.getCurrentUser();
     
-    // তৈরি করা আপডেট প্রোফাইল অবজেক্ট
     const updatedUser: UserProfile = {
       ...(current || {
         id: userId,
@@ -80,10 +89,8 @@ export const authService = {
       ...updates
     };
 
-    // ১. লোকাল স্টোরেজে স্থায়ীভাবে সংরক্ষণ
     localStorage.setItem(CURRENT_USER_STORAGE_KEY, JSON.stringify(updatedUser));
 
-    // ২. অল ইউজার লিস্টিংয়ে আপডেট
     const users = this.getAllUsers();
     const index = users.findIndex(u => u.id === userId || u.email === updatedUser.email);
     if (index !== -1) {
@@ -93,7 +100,6 @@ export const authService = {
     }
     localStorage.setItem(USERS_STORAGE_KEY, JSON.stringify(users));
 
-    // ৩. সুপাবেজ ক্লাউডে মেটাডেটা আপডেট
     if (this.isConfigured && supabase) {
       try {
         await supabase.auth.updateUser({
@@ -110,12 +116,12 @@ export const authService = {
           }
         });
       } catch (err) {
-        // ক্লাউড না থাকলেও লোকাল সিঙ্ক সচল থাকবে
+        // silent fallback
       }
     }
 
     notifyAuthChange(updatedUser);
-    return { success: true, user: updatedUser, message: 'প্রোফাইল তথ্য সফলভাবে সংরক্ষণ করা হয়েছে!' };
+    return { success: true, user: updatedUser, message: 'তথ্য সফলভাবে সেভ হয়েছে!' };
   },
 
   async signIn(identifier: string, password: string): Promise<{ success: boolean; user?: UserProfile; message?: string }> {
@@ -138,7 +144,6 @@ export const authService = {
           role = 'admin';
         }
 
-        // পূর্বে লোকাল স্টোরেজে সংরক্ষিত প্রোফাইল থাকলে তা অগ্রাধিকার পাবে
         const savedLocal = this.getCurrentUser();
 
         const userProfile: UserProfile = {
