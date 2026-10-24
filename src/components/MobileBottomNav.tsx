@@ -1,5 +1,5 @@
 import React from 'react';
-import { Home, Search, Activity, Users } from 'lucide-react';
+import { Home, Search, HeartPulse, Users } from 'lucide-react';
 
 interface MobileBottomNavProps {
   currentTab: string;
@@ -13,7 +13,7 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
   const navItems = [
     { id: 'home', label: 'হোম', icon: Home },
     { id: 'search', label: 'রক্ত খুঁজুন', icon: Search },
-    { id: 'emergency', label: 'জরুরি রক্ত', icon: Activity },
+    { id: 'emergency', label: 'জরুরি রক্ত', icon: HeartPulse },
     { id: 'donor', label: 'ডোনার', icon: Users },
   ];
 
