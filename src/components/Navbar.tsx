@@ -23,7 +23,7 @@ export const Navbar: React.FC<NavbarProps> = ({
 
   return (
     <header className="sticky top-0 z-40 bg-white border-b border-slate-200 shadow-xs">
-      {/* Top Banner (Contact & WhatsApp English) */}
+      {/* Top Banner (English Contact & WhatsApp) */}
       <div className="bg-red-700 text-white text-[11px] py-1 px-4 flex justify-between items-center max-w-7xl mx-auto">
         <span className="font-medium">জরুরি রক্তের প্রয়োজনে সরাসরি যোগাযোগ করুন</span>
         <div className="flex items-center gap-3">
@@ -40,8 +40,6 @@ export const Navbar: React.FC<NavbarProps> = ({
 
       {/* Main Navbar */}
       <div className="max-w-7xl mx-auto px-3 sm:px-6 h-16 flex items-center justify-between">
-        
-        {/* Brand Logo */}
         <div className="flex items-center gap-2 cursor-pointer" onClick={() => window.location.href = '/'}>
           <div className="w-9 h-9 rounded-2xl bg-red-600 flex items-center justify-center text-white shadow-md shrink-0">
             <Heart className="w-5 h-5 fill-white" />
@@ -52,11 +50,9 @@ export const Navbar: React.FC<NavbarProps> = ({
           </div>
         </div>
 
-        {/* Action Buttons */}
         <div className="flex items-center gap-2">
           {!currentUser ? (
             <>
-              {/* Login Dropdown */}
               <div className="relative">
                 <button
                   onClick={() => setShowLoginDropdown(!showLoginDropdown)}
@@ -88,7 +84,6 @@ export const Navbar: React.FC<NavbarProps> = ({
                 )}
               </div>
 
-              {/* Join as Donor Button */}
               <button
                 onClick={onOpenRegister}
                 className="px-3 py-1.5 sm:px-4 sm:py-2 rounded-xl text-xs font-bold text-white bg-red-600 hover:bg-red-700 flex items-center gap-1 transition-colors cursor-pointer shadow-sm shrink-0"
@@ -116,7 +111,6 @@ export const Navbar: React.FC<NavbarProps> = ({
             </div>
           )}
         </div>
-
       </div>
     </header>
   );
