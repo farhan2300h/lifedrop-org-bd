@@ -216,9 +216,6 @@ export const authService = {
     };
   },
 
-  /** 
-   * User Sign In (Admin & User Support)
-   */
   async signIn(identifier: string, password: string): Promise<{ success: boolean; user?: UserProfile; message?: string }> {
     const cleanId = identifier.trim();
     if (!cleanId || !password) {
@@ -259,7 +256,6 @@ export const authService = {
         let role: UserRole = 'user';
         const userEmail = (data.user.email || cleanId).toLowerCase();
 
-        // 🎯 Admin Role Hard-Override for designated email
         if (
           userEmail === 'blooddonationnetwork5@gmail.com' ||
           data.user.app_metadata?.role === 'admin' ||
