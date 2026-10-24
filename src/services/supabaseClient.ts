@@ -161,15 +161,6 @@ export const authService = {
           fullName: cleanName,
           phone: cleanPhone,
           role: 'user',
-          bloodGroup: params.bloodGroup,
-          division: params.division,
-          district: params.district,
-          upazila: params.upazila,
-          gender: params.gender,
-          age: params.age,
-          avatarUrl: params.avatarUrl || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=250&q=80',
-          occupation: params.occupation,
-          bio: params.bio,
           createdAt: new Date().toISOString()
         };
 
@@ -192,15 +183,6 @@ export const authService = {
       fullName: cleanName,
       phone: cleanPhone,
       role: 'user',
-      bloodGroup: params.bloodGroup,
-      division: params.division,
-      district: params.district,
-      upazila: params.upazila,
-      gender: params.gender,
-      age: params.age,
-      avatarUrl: params.avatarUrl || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=250&q=80',
-      occupation: params.occupation,
-      bio: params.bio,
       createdAt: new Date().toISOString()
     };
 
