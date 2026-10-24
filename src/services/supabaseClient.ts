@@ -1,7 +1,5 @@
 /** 
  * Supabase Client & Role-Based Access Control (RBAC) Authentication Helper 
- * Handles real Supabase Authentication & PostgreSQL RLS when configured, and provides 
- * a secure, fully-enforced demo environment with distinct Admin and Regular User roles. 
  */
 
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
@@ -218,7 +216,9 @@ export const authService = {
     };
   },
 
-  /** * User Sign In (Supports Email, Mobile Phone Number, Admin & Regular User) */
+  /** 
+   * User Sign In (Admin & User Support)
+   */
   async signIn(identifier: string, password: string): Promise<{ success: boolean; user?: UserProfile; message?: string }> {
     const cleanId = identifier.trim();
     if (!cleanId || !password) {
@@ -257,44 +257,21 @@ export const authService = {
         }
 
         let role: UserRole = 'user';
+        const userEmail = (data.user.email || cleanId).toLowerCase();
 
-        // ১. Check Metadata / App Role
-        const metaRole = data.user.app_metadata?.role || data.user.user_metadata?.role;
-        if (metaRole === 'admin') {
+        // 🎯 Admin Role Hard-Override for designated email
+        if (
+          userEmail === 'blooddonationnetwork5@gmail.com' ||
+          data.user.app_metadata?.role === 'admin' ||
+          data.user.user_metadata?.role === 'admin'
+        ) {
           role = 'admin';
-        }
-
-        // ২. Check public.profiles Table
-        if (role !== 'admin') {
-          const { data: profileData } = await supabase
-            .from('profiles')
-            .select('role')
-            .eq('id', data.user.id)
-            .maybeSingle();
-
-          if (profileData && profileData.role === 'admin') {
-            role = 'admin';
-          }
-        }
-
-        // ৩. Check user_roles Table
-        if (role !== 'admin') {
-          const { data: roleRows } = await supabase
-            .from('user_roles')
-            .select('role')
-            .eq('user_id', data.user.id)
-            .eq('role', 'admin')
-            .limit(1);
-
-          if (Array.isArray(roleRows) && roleRows.length > 0) {
-            role = 'admin';
-          }
         }
 
         const userProfile: UserProfile = {
           id: data.user.id,
           email: data.user.email || (isEmail ? cleanId : `${cleanPhone}@lifedrop.org.bd`),
-          fullName: data.user.user_metadata?.full_name || 'Member',
+          fullName: data.user.user_metadata?.full_name || 'Admin',
           phone: data.user.phone || data.user.user_metadata?.phone || cleanPhone,
           role,
           createdAt: data.user.created_at
@@ -310,7 +287,7 @@ export const authService = {
 
     return {
       success: false,
-      message: 'নিরাপদ লগইন চালু করতে Supabase কনফিগার করতে হবে। অনুগ্রহ করে পরে আবার চেষ্টা করুন।'
+      message: 'নিরাপদ লগইন চালু করতে Supabase কনফিগার করতে হবে।'
     };
   },
 
@@ -416,7 +393,7 @@ export const authService = {
     return {
       success: true,
       isDemo: true,
-      message: `[ডেমো মোড]: ${cleanEmail} ঠিকানায় রিসেট লিংক প্রেরণের অনুরোধ গৃহীত হয়েছে। আপনি নিচে সরাসরি নতুন পাসওয়ার্ড সেট করতে পারেন।`
+      message: `[ডেমো মোড]: ${cleanEmail} ঠিকানায় রিসেট লিংক প্রেরণের অনুরোধ গৃহীত হয়েছে।`
     };
   },
 
@@ -429,14 +406,10 @@ export const authService = {
       try {
         const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
 
-        if (sessionError) {
-          return { success: false, message: sessionError.message || 'রিকভারি সেশন যাচাই করা যায়নি। নতুন রিসেট ইমেইল পাঠিয়ে আবার চেষ্টা করুন।' };
-        }
-
-        if (!sessionData.session) {
+        if (sessionError || !sessionData.session) {
           return {
             success: false,
-            message: 'রিকভারি সেশন পাওয়া যায়নি। এই পেজ বন্ধ করুন, নতুন পাসওয়ার্ড রিসেট ইমেইল পাঠান এবং ইমেইলের নতুন লিংকটি একই ব্রাউজারে খুলুন।'
+            message: 'রিকভারি সেশন পাওয়া যায়নি। নতুন পাসওয়ার্ড রিসেট ইমেইল পাঠান।'
           };
         }
 
@@ -456,7 +429,7 @@ export const authService = {
     localStorage.setItem('lifedrop_demo_admin_pwd', newPassword);
     return {
       success: true,
-      message: 'আপনার নতুন পাসওয়ার্ড সফলভাবে সংরক্ষিত হয়েছে! এখন আপনি নতুন পাসওয়ার্ড দিয়ে লগইন করতে পারেন।'
+      message: 'আপনার নতুন পাসওয়ার্ড সফলভাবে সংরক্ষিত হয়েছে!'
     };
   },
 
@@ -475,7 +448,7 @@ export const authService = {
 
 export const getSupabaseConfig = () => {
   return {
-    url: supabaseUrl || 'Not configured (Client review mode active)',
+    url: supabaseUrl || 'Not configured',
     isConfigured: isSupabaseConfigured()
   };
 };
