@@ -29,9 +29,7 @@ const dateText = (value?: string | null) => {
   return Number.isNaN(d.getTime()) ? value : d.toLocaleDateString('bn-BD');
 };
 
-export const HomePage: React.FC<HomePageProps> = ({
-  onOpenRegister, onOpenLogin, currentTab = 'home'
-}) => {
+export const HomePage: React.FC<HomePageProps> = ({ onOpenRegister, onOpenLogin, currentTab = 'home' }) => {
   const [donors, setDonors] = useState<Donor[]>([]);
   const [requests, setRequests] = useState<BloodRequest[]>([]);
   const [loading, setLoading] = useState(true);
@@ -48,10 +46,7 @@ export const HomePage: React.FC<HomePageProps> = ({
     try {
       setError('');
       await bloodService.init();
-      const [d, r] = await Promise.all([
-        bloodService.fetchRealDonors(),
-        bloodService.fetchRealRequests()
-      ]);
+      const [d, r] = await Promise.all([bloodService.fetchRealDonors(), bloodService.fetchRealRequests()]);
       setDonors(d);
       setRequests(r);
     } catch {
@@ -123,20 +118,17 @@ export const HomePage: React.FC<HomePageProps> = ({
   if (currentTab === 'search' || currentTab === 'donor') {
     return (
       <div className="mx-auto max-w-6xl space-y-5 px-3 py-6 pb-24 sm:px-5">
-        <Heading title={currentTab === 'search' ? 'রক্ত খুঁজুন' : 'অনুমোদিত রক্তদাতাদের তালিকা'}
-          desc="শুধু ডেটাবেজে থাকা অনুমোদিত রক্তদাতাদের তথ্য দেখানো হচ্ছে।" />
+        <Heading title={currentTab === 'search' ? 'রক্ত খুঁজুন' : 'অনুমোদিত রক্তদাতাদের তালিকা'} desc="শুধু ডেটাবেজে থাকা অনুমোদিত রক্তদাতাদের তথ্য দেখানো হচ্ছে।" />
         <div className="grid gap-3 sm:grid-cols-2">
           <select className={input} value={bloodFilter} onChange={e => setBloodFilter(e.target.value)}>
             <option value="">সব রক্তের গ্রুপ</option>
             {GROUPS.map(g => <option key={g} value={g}>{g}</option>)}
           </select>
-          <input className={input} placeholder="জেলা লিখুন" value={districtFilter}
-            onChange={e => setDistrictFilter(e.target.value)} />
+          <input className={input} placeholder="জেলা লিখুন" value={districtFilter} onChange={e => setDistrictFilter(e.target.value)} />
         </div>
-        {loading ? <Loading /> : filteredDonors.length > 0
-          ? <div className="grid gap-4 sm:grid-cols-2">{filteredDonors.map(d => <DonorCard key={d.id} donor={d} />)}</div>
-          : <Empty icon={Users} title="এখনো কোনো অনুমোদিত ডোনার নেই"
-              text="রেজিস্ট্রেশন ও অ্যাডমিন অনুমোদনের পর ডোনার এখানে দেখা যাবে।" />}
+        {loading ? <Loading /> : filteredDonors.length ? (
+          <div className="grid gap-4 sm:grid-cols-2">{filteredDonors.map(d => <DonorCard key={d.id} donor={d} />)}</div>
+        ) : <Empty icon={Users} title="এখনো কোনো অনুমোদিত ডোনার নেই" text="রেজিস্ট্রেশন ও অ্যাডমিন অনুমোদনের পর ডোনার এখানে দেখা যাবে।" />}
       </div>
     );
   }
@@ -147,48 +139,45 @@ export const HomePage: React.FC<HomePageProps> = ({
         <Emergency />
         <div className="flex items-center justify-between gap-3">
           <Heading title="রক্তের আবেদন" desc="বাস্তব আবেদন ডেটাবেজ থেকে দেখানো হচ্ছে।" />
-          <button onClick={() => setShowForm(v => !v)}
-            className="shrink-0 rounded-xl bg-red-600 px-4 py-3 text-sm font-bold text-white">
+          <button onClick={() => setShowForm(v => !v)} className="shrink-0 rounded-xl bg-red-600 px-4 py-3 text-sm font-bold text-white">
             {showForm ? 'বন্ধ করুন' : 'আবেদন করুন'}
           </button>
         </div>
         {showForm && <RequestForm form={form} setForm={setForm} onSubmit={submitRequest} submitting={submitting} error={formError} />}
         {successId && <Success id={successId} />}
-        {loading ? <Loading /> : activeRequests.length > 0
-          ? activeRequests.map(r => <RequestCard key={r.id} request={r} />)
-          : <Empty icon={Droplet} title="এখনো কোনো রক্তের আবেদন নেই" text="বাস্তব আবেদন জমা হলে এখানে দেখা যাবে।" />}
+        {loading ? <Loading /> : activeRequests.length ? activeRequests.map(r => <RequestCard key={r.id} request={r} />) : <Empty icon={Droplet} title="এখনো কোনো রক্তের আবেদন নেই" text="বাস্তব আবেদন জমা হলে এখানে দেখা যাবে।" />}
       </div>
     );
   }
 
   return (
-    <div className="space-y-8 bg-slate-50 pb-24">
-      <section className="mx-auto max-w-6xl px-3 pt-4 sm:px-5 sm:pt-6">
+    <div className="space-y-7 bg-slate-50 pb-24">
+      {/* HERO: Home page only */}
+      <section className="mx-auto max-w-6xl px-3 pt-3 sm:px-5 sm:pt-6">
         <div className="relative isolate overflow-hidden rounded-[28px] bg-gradient-to-br from-rose-950 via-red-800 to-red-600 text-white shadow-xl">
-          <div className="grid items-center gap-4 p-5 sm:grid-cols-2 sm:p-9">
+          <div className="grid items-center gap-4 p-4 sm:grid-cols-2 sm:p-9">
             <div className="space-y-4">
               <span className="inline-flex items-center gap-2 rounded-full border border-white/25 bg-white/10 px-3 py-1.5 text-xs font-bold">
                 <Heart className="h-4 w-4 fill-current" /> LifeDrop Blood Donation Network
               </span>
               <h1 className="text-3xl font-black leading-tight sm:text-5xl">রক্ত দিন,<br /><span className="text-amber-300">জীবন বাঁচান</span> ❤️</h1>
-              <p className="max-w-lg text-sm leading-7 text-rose-50 sm:text-base">
-                আপনার স্বেচ্ছায় দেওয়া এক ব্যাগ রক্ত কারও জীবনে নতুন আশার আলো হতে পারে।
-              </p>
-              <div className="flex flex-wrap gap-3">
-                <button onClick={() => document.getElementById('donor-list')?.scrollIntoView({ behavior: 'smooth' })}
-                  className="inline-flex items-center gap-2 rounded-full bg-white px-5 py-3 text-sm font-black text-red-700">
+              <p className="max-w-lg text-sm leading-7 text-rose-50 sm:text-base">আপনার স্বেচ্ছায় দেওয়া এক ব্যাগ রক্ত কারও জীবনে নতুন আশার আলো হতে পারে।</p>
+              <div className="flex flex-wrap gap-2">
+                <button onClick={() => document.getElementById('donor-list')?.scrollIntoView({ behavior: 'smooth' })} className="inline-flex items-center gap-2 rounded-full bg-white px-4 py-3 text-sm font-black text-red-700">
                   <Search className="h-4 w-4" /> রক্ত খুঁজুন <ArrowRight className="h-4 w-4" />
                 </button>
-                <button onClick={onOpenRegister}
-                  className="inline-flex items-center gap-2 rounded-full border border-white/40 bg-white/10 px-5 py-3 text-sm font-bold text-white">
+                <button onClick={onOpenRegister} className="inline-flex items-center gap-2 rounded-full border border-white/40 bg-white/10 px-4 py-3 text-sm font-bold text-white">
                   <Heart className="h-4 w-4" /> রক্তদাতা হোন
                 </button>
               </div>
             </div>
             <div className="relative flex min-h-48 items-center justify-center overflow-hidden rounded-2xl bg-red-950 sm:min-h-64">
-              <img src="https://images.unsplash.com/photo-1615461066841-6116e61058f4?auto=format&fit=crop&w=1000&q=85"
-                alt="রক্তদান কার্যক্রম" className="absolute inset-0 h-full w-full object-cover opacity-60"
-                onError={e => { e.currentTarget.style.display = 'none'; }} />
+              <img
+                src="https://images.unsplash.com/photo-1615461066841-6116e61058f4?auto=format&fit=crop&w=1000&q=85"
+                alt="রক্তদান কার্যক্রম"
+                className="absolute inset-0 h-full w-full object-cover opacity-60"
+                onError={e => { e.currentTarget.style.display = 'none'; }}
+              />
               <div className="absolute inset-0 bg-gradient-to-r from-red-950/70 to-red-900/20" />
               <div className="relative flex h-36 w-36 items-center justify-center rounded-full border border-white/40 bg-white/15 backdrop-blur-sm sm:h-48 sm:w-48">
                 <Droplet className="h-24 w-24 fill-red-500 text-white sm:h-32 sm:w-32" />
@@ -242,9 +231,7 @@ export const HomePage: React.FC<HomePageProps> = ({
             <Calendar className="h-8 w-8 shrink-0 text-rose-300" />
             <div>
               <h2 className="text-xl font-black sm:text-2xl">কত দিন পর আবার রক্ত দেবেন?</h2>
-              <p className="mt-2 text-sm leading-7 text-slate-200">
-                অনেক কেন্দ্রে পূর্ণ রক্তদানের পর অন্তত ৮–১২ সপ্তাহ বা প্রায় ৩ মাস বিরতি রাখা হয়; কোথাও আরও বেশি সময় প্রয়োজন হতে পারে। নিজের শেষ দানের তারিখ, স্বাস্থ্য এবং কেন্দ্রের নিয়ম অনুযায়ী পরবর্তী তারিখ নিশ্চিত করুন।
-              </p>
+              <p className="mt-2 text-sm leading-7 text-slate-200">অনেক কেন্দ্রে পূর্ণ রক্তদানের পর অন্তত ৮–১২ সপ্তাহ বা প্রায় ৩ মাস বিরতি রাখা হয়; কোথাও আরও বেশি সময় প্রয়োজন হতে পারে। নিজের শেষ দানের তারিখ, স্বাস্থ্য এবং কেন্দ্রের নিয়ম অনুযায়ী পরবর্তী তারিখ নিশ্চিত করুন।</p>
             </div>
           </div>
         </div>
@@ -257,12 +244,11 @@ export const HomePage: React.FC<HomePageProps> = ({
           <Checklist icon={Utensils} title="স্বাভাবিক খাবার খান" text="খালি পেটে রক্ত দিতে যাবেন না; স্বাভাবিক ও পুষ্টিকর খাবার খান।" color="green" />
           <Checklist icon={Moon} title="পর্যাপ্ত ঘুম ও বিশ্রাম" text="ভালোভাবে ঘুমান। জ্বর বা অসুস্থতা থাকলে রক্তদান স্থগিত রাখুন।" color="violet" />
           <Checklist icon={Activity} title="নিজের স্বাস্থ্য সম্পর্কে জানান" text="অসুস্থতা, ওষুধ সেবন বা সাম্প্রতিক রক্তদানের ইতিহাস কর্মীদের জানান।" color="rose" />
-          <Checklist icon={ShieldCheck} title="আর্থিক লেনদেন নয়" text="রক্তদান স্বেচ্ছাসেবামূলক। রক্তের বিনিময়ে টাকা নেওয়া বা দেওয়া যাবে না।" color="rose" />
         </div>
       </section>
 
       <section className="mx-auto max-w-6xl px-3 sm:px-5">
-        <Heading title="রক্ত দেওয়ার পরে করণীয়" desc="রক্তদানের পর কেন্দ্রের নির্দেশনা মেনে চলুন." />
+        <Heading title="রক্ত দেওয়ার পরে করণীয়" desc="রক্তদানের পর কেন্দ্রের নির্দেশনা মেনে চলুন।" />
         <div className="mt-4 grid gap-3 sm:grid-cols-2">
           <Checklist icon={GlassWater} title="পানি ও তরল পান করুন" text="পরবর্তী কয়েক ঘণ্টা পর্যাপ্ত পানি পান করুন।" color="blue" />
           <Checklist icon={Bed} title="বিশ্রাম নিন" text="কেন্দ্রের পরামর্শ অনুযায়ী বিশ্রাম নিন; মাথা ঘুরলে বসে বা শুয়ে পড়ুন।" color="green" />
@@ -281,9 +267,7 @@ export const HomePage: React.FC<HomePageProps> = ({
         {showForm && <div className="mt-4"><RequestForm form={form} setForm={setForm} onSubmit={submitRequest} submitting={submitting} error={formError} /></div>}
         {successId && <div className="mt-4"><Success id={successId} /></div>}
         <div className="mt-4 space-y-3">
-          {loading ? <Loading /> : activeRequests.length > 0
-            ? activeRequests.map(r => <RequestCard key={r.id} request={r} />)
-            : <Empty icon={Droplet} title="বর্তমানে কোনো সক্রিয় রক্তের আবেদন নেই" text="বাস্তব আবেদন জমা হলে এখানে দেখা যাবে।" />}
+          {loading ? <Loading /> : activeRequests.length ? activeRequests.map(r => <RequestCard key={r.id} request={r} />) : <Empty icon={Droplet} title="বর্তমানে কোনো সক্রিয় রক্তের আবেদন নেই" text="বাস্তব আবেদন জমা হলে এখানে দেখা যাবে।" />}
         </div>
       </section>
 
@@ -291,14 +275,13 @@ export const HomePage: React.FC<HomePageProps> = ({
         <Heading title="অনুমোদিত রক্তদাতাদের তালিকা" desc="শুধু যাচাইকৃত ও অনুমোদিত ডোনার দেখানো হচ্ছে।" />
         <div className="mt-4 grid gap-3 sm:grid-cols-2">
           <select className={input} value={bloodFilter} onChange={e => setBloodFilter(e.target.value)}>
-            <option value="">সব রক্তের গ্রুপ</option>{GROUPS.map(g => <option key={g} value={g}>{g}</option>)}
+            <option value="">সব রক্তের গ্রুপ</option>
+            {GROUPS.map(g => <option key={g} value={g}>{g}</option>)}
           </select>
           <input className={input} placeholder="জেলা লিখুন" value={districtFilter} onChange={e => setDistrictFilter(e.target.value)} />
         </div>
         <div className="mt-4 grid gap-4 sm:grid-cols-2">
-          {loading ? <Loading /> : filteredDonors.length > 0
-            ? filteredDonors.slice(0, 4).map(d => <DonorCard key={d.id} donor={d} />)
-            : <div className="sm:col-span-2"><Empty icon={Users} title="এখনো কোনো অনুমোদিত ডোনার নেই" text="ডোনার রেজিস্ট্রেশন ও অনুমোদনের পর এখানে দেখা যাবে।" /></div>}
+          {loading ? <Loading /> : filteredDonors.length ? filteredDonors.slice(0, 4).map(d => <DonorCard key={d.id} donor={d} />) : <div className="sm:col-span-2"><Empty icon={Users} title="এখনো কোনো অনুমোদিত ডোনার নেই" text="ডোনার রেজিস্ট্রেশন ও অনুমোদনের পর এখানে দেখা যাবে।" /></div>}
         </div>
       </section>
 
@@ -306,24 +289,18 @@ export const HomePage: React.FC<HomePageProps> = ({
         <div className="overflow-hidden rounded-3xl border border-rose-100 bg-white shadow-sm">
           <div className="grid sm:grid-cols-2">
             <div className="relative min-h-52 bg-rose-100">
-              <img src="https://images.unsplash.com/photo-1615461066841-6116e61058f4?auto=format&fit=crop&w=1000&q=85"
-                alt="রক্তদানের সচেতনতামূলক ছবি" className="absolute inset-0 h-full w-full object-cover"
-                onError={e => { e.currentTarget.style.display = 'none'; }} />
+              <img src="https://images.unsplash.com/photo-1615461066841-6116e61058f4?auto=format&fit=crop&w=1000&q=85" alt="রক্তদানের সচেতনতামূলক ছবি" className="absolute inset-0 h-full w-full object-cover" onError={e => { e.currentTarget.style.display = 'none'; }} />
               <div className="absolute inset-0 bg-gradient-to-r from-red-950/70 to-transparent" />
               <div className="relative p-6 text-white">
                 <span className="rounded-full bg-white/20 px-3 py-1 text-xs font-bold">রক্তদান সচেতনতা</span>
-                <h2 className="mt-4 text-2xl font-black">রক্তদানে এগিয়ে আসুন</h2>
+                <h2 className="mt-4 text-2xl font-black">রক্তদান এগিয়ে আসুন</h2>
                 <p className="mt-2 text-sm">মানুষের পাশে মানুষ থাকুক।</p>
               </div>
             </div>
             <div className="flex flex-col justify-center p-6 sm:p-8">
               <h3 className="text-xl font-black text-slate-900">আপনার একটি রক্তদান, কারও জীবনে নতুন আশা</h3>
-              <p className="mt-3 text-sm leading-7 text-slate-600">
-                এখানে বাস্তব ক্যাম্পেইনের তারিখ, স্থান ও আয়োজকের তথ্য যুক্ত করা যাবে। বর্তমানে যাচাইকৃত ক্যাম্পেইনের তথ্য নেই, তাই কোনো বানানো ইভেন্ট দেখানো হচ্ছে না।
-              </p>
-              <button onClick={onOpenRegister} className="mt-5 inline-flex w-fit items-center gap-2 rounded-xl bg-red-600 px-5 py-3 text-sm font-bold text-white">
-                রক্তদাতা হিসেবে যুক্ত হোন <ArrowRight className="h-4 w-4" />
-              </button>
+              <p className="mt-3 text-sm leading-7 text-slate-600">এখানে বাস্তব ক্যাম্পেইনের তারিখ, স্থান ও আয়োজকের তথ্য যুক্ত করা যাবে। বর্তমানে যাচাইকৃত ক্যাম্পেইনের তথ্য নেই, তাই কোনো বানানো ইভেন্ট দেখানো হচ্ছে না।</p>
+              <button onClick={onOpenRegister} className="mt-5 inline-flex w-fit items-center gap-2 rounded-xl bg-red-600 px-5 py-3 text-sm font-bold text-white">রক্তদাতা হিসেবে যুক্ত হোন <ArrowRight className="h-4 w-4" /></button>
             </div>
           </div>
         </div>
@@ -342,9 +319,7 @@ export const HomePage: React.FC<HomePageProps> = ({
           <Emergency />
         </div>
       </section>
-      <p className="mx-auto max-w-6xl px-4 text-center text-xs leading-6 text-slate-400">
-        স্বাস্থ্য-সংক্রান্ত তথ্য সাধারণ সচেতনতার জন্য। রক্তদানের যোগ্যতা ও পরবর্তী দানের সময় রক্তদান কেন্দ্রের চিকিৎসাকর্মীর কাছ থেকে নিশ্চিত করুন।
-      </p>
+      <p className="mx-auto max-w-6xl px-4 text-center text-xs leading-6 text-slate-400">স্বাস্থ্য-সংক্রান্ত তথ্য সাধারণ সচেতনতার জন্য। রক্তদানের যোগ্যতা ও পরবর্তী দানের সময় রক্তদান কেন্দ্রের চিকিৎসাকর্মীর কাছ থেকে নিশ্চিত করুন।</p>
     </div>
   );
 };
@@ -386,13 +361,7 @@ function Emergency() {
 function Success({ id }: { id: string }) {
   return <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900"><div className="flex items-center gap-2 font-black"><CheckCircle2 className="h-5 w-5" /> আবেদন সিস্টেমে সংরক্ষিত হয়েছে</div><p className="mt-1">রেফারেন্স: <b className="font-mono">{id}</b></p></div>;
 }
-function RequestForm({ form, setForm, onSubmit, submitting, error }: {
-  form: typeof EMPTY_FORM;
-  setForm: React.Dispatch<React.SetStateAction<typeof EMPTY_FORM>>;
-  onSubmit: (e: React.FormEvent) => void;
-  submitting: boolean;
-  error: string;
-}) {
+function RequestForm({ form, setForm, onSubmit, submitting, error }: { form: typeof EMPTY_FORM; setForm: React.Dispatch<React.SetStateAction<typeof EMPTY_FORM>>; onSubmit: (e: React.FormEvent) => void; submitting: boolean; error: string }) {
   const update = (key: keyof typeof EMPTY_FORM, value: string | boolean) => setForm(p => ({ ...p, [key]: value }));
   return (
     <form onSubmit={onSubmit} className={`${card} space-y-4 p-4 sm:p-6`}>
@@ -413,7 +382,10 @@ function RequestForm({ form, setForm, onSubmit, submitting, error }: {
         <input required className={input} type="tel" placeholder="মোবাইল নম্বর *" value={form.contactPhone} onChange={e => update('contactPhone', e.target.value)} />
         <textarea className={`${input} sm:col-span-2`} rows={3} placeholder="রোগের বিবরণ (ঐচ্ছিক)" value={form.reason} onChange={e => update('reason', e.target.value)} />
       </div>
-      <label className="flex items-start gap-3 text-sm leading-6 text-slate-600"><input required type="checkbox" checked={form.consent} onChange={e => update('consent', e.target.checked)} className="mt-1 h-4 w-4 accent-red-600" />আমি নিশ্চিত করছি যে দেওয়া তথ্য সঠিক এবং প্রয়োজনে যোগাযোগের সম্মতি দিচ্ছি।</label>
+      <label className="flex items-start gap-3 text-sm leading-6 text-slate-600">
+        <input required type="checkbox" checked={form.consent} onChange={e => update('consent', e.target.checked)} className="mt-1 h-4 w-4 accent-red-600" />
+        আমি নিশ্চিত করছি যে দেওয়া তথ্য সঠিক এবং প্রয়োজনে যোগাযোগের সম্মতি দিচ্ছি।
+      </label>
       {error && <p className="rounded-xl bg-red-50 p-3 text-sm text-red-700">{error}</p>}
       <button disabled={submitting} className="flex w-full items-center justify-center gap-2 rounded-xl bg-red-600 px-5 py-3.5 font-black text-white disabled:opacity-60">
         {submitting ? <><Loader2 className="h-5 w-5 animate-spin" /> জমা হচ্ছে...</> : <><PlusCircle className="h-5 w-5" /> আবেদন জমা দিন</>}
@@ -423,8 +395,7 @@ function RequestForm({ form, setForm, onSubmit, submitting, error }: {
 }
 
 export default HomePage;
- value={form.reason} onChange={e => update('reason', e.target.value)} />
+ange={e => update('reason', e.target.value)} />
       </div>
-      <label className="flex items-start gap-3 text-sm leading-6 text-slate-600"><input required type="checkbox" checked={form.consent} onChange={e => update('consent', e.target.checked)} className="mt-1 h-4 w-4 accent-red-600" />আমি নিশ্চিত করছি যে দেওয়া তথ্য সঠিক এবং প্রয়োজনে যোগাযোগের সম্মতি দিচ্ছি।</label>
-      {error && <p className="rounded-xl bg-red-50 p-3 text-sm text-red-700">{error}</p>}
-      <button disabl
+      <label className="flex items-start gap-3 text-sm leading-6 text-slate-600">
+        <input required type="ch
