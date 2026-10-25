@@ -524,11 +524,3 @@ function RequestForm({ form, setForm, onSubmit, submitting, error }: {
 }
 
 export default HomePage;
-ange={e => update('reason', e.target.value)} />
-      </div>
-      <label className="flex items-start gap-3 text-sm leading-6 text-slate-600">
-        <input required type="checkbox" checked={form.consent} onChange={e => update('consent', e.target.checked)} className="mt-1 h-4 w-4 accent-red-600" />
-        আমি নিশ্চিত করছি যে দেওয়া তথ্য সঠিক এবং প্রয়োজনে যোগাযোগের সম্মতি দিচ্ছি।
-      </label>
-      {error && <p className="rounded-xl bg-red-50 p-3 text-sm text-red-700">{error}</p>}
-      <button disabled={submitting} classNa
