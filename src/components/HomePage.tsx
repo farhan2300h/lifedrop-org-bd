@@ -395,7 +395,31 @@ function RequestForm({ form, setForm, onSubmit, submitting, error }: { form: typ
 }
 
 export default HomePage;
-ange={e => update('reason', e.target.value)} />
-      </div>
-      <label className="flex items-start gap-3 text-sm leading-6 text-slate-600">
-        <input required type="ch
+
+    {error && (
+      <p className="rounded-xl bg-red-50 p-3 text-sm text-red-700">
+        {error}
+      </p>
+    )}
+
+    <button
+      disabled={submitting}
+      className="flex w-full items-center justify-center gap-2 rounded-xl bg-red-600 px-5 py-3.5 font-black text-white disabled:opacity-60"
+    >
+      {submitting ? (
+        <>
+          <Loader2 className="h-5 w-5 animate-spin" />
+          জমা হচ্ছে...
+        </>
+      ) : (
+        <>
+          <PlusCircle className="h-5 w-5" />
+          আবেদন জমা দিন
+        </>
+      )}
+    </button>
+  </form>
+  );
+}
+
+export default HomePage;
